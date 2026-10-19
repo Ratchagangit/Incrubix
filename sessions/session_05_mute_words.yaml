@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_05_mute_words
+steps:
+  - say: "Mute audio"
+  - say: "render"

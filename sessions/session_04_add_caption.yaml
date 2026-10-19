@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_04_add_caption
+steps:
+  - say: "Add a caption 'Welcome!' when I say welcome to the channel"
+  - say: "render"

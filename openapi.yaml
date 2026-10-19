@@ -1,0 +1,790 @@
+openapi: 3.1.0
+info:
+  title: IncuBrix Prompt-Based Video Editing Engine API
+  version: 1.0.0
+  description: >
+    Production-grade API for non-destructive, natural-language prompt-based video editing.
+    Edits adhere to semantic content anchors rather than clock positions.
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: /
+    description: Current host
+
+paths:
+  /health:
+    get:
+      summary: Liveness probe
+      description: Returns service liveness status and version.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is alive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /ready:
+    get:
+      summary: Readiness probe
+      description: Validates dependencies including storage accessibility and media binaries.
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: Service is fully operational.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessStatus'
+        '503':
+          description: Service dependencies are unavailable.
+
+  /api/v1/videos/upload:
+    post:
+      summary: Upload video file
+      description: Ingests an MP4/MOV video, computes SHA-256 hash, extracts stream metadata, and schedules background transcription.
+      operationId: uploadVideo
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Optional idempotency key to prevent duplicate uploads.
+        - name: X-Correlation-Id
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Optional trace correlation ID.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Video file to upload.
+      responses:
+        '202':
+          description: Video accepted and transcription job queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadAcceptedResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/videos/url:
+    post:
+      summary: Ingest video from URL
+      description: Ingests video from a public URL and schedules transcription.
+      operationId: ingestVideoUrl
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                callback_url:
+                  type: string
+                  format: uri
+      responses:
+        '202':
+          description: Video ingestion accepted and transcription queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadAcceptedResponse'
+
+  /api/v1/videos/{video_id}:
+    get:
+      summary: Get video metadata
+      operationId: getVideo
+      parameters:
+        - name: video_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Video metadata details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoDetailResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/videos/{video_id}/transcript:
+    get:
+      summary: Retrieve video transcript
+      operationId: getVideoTranscript
+      parameters:
+        - name: video_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Word-level timestamped transcript.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transcript'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/videos/{video_id}/download:
+    get:
+      summary: Download source video
+      operationId: downloadVideo
+      parameters:
+        - name: video_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Video binary stream.
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/projects/{project_id}/instructions:
+    post:
+      summary: Submit natural language editing instruction
+      description: Parses instruction, validates operations, deterministically updates the timeline, and records history.
+      operationId: submitInstruction
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+          description: Safe retry idempotency key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstructionRequest'
+      responses:
+        '200':
+          description: Three-way instruction evaluation outcome.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstructionResult'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/projects/{project_id}/timeline:
+    get:
+      summary: Get project timeline state
+      operationId: getTimeline
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current timeline state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Timeline'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/projects/{project_id}/history:
+    get:
+      summary: Retrieve edit transaction history
+      operationId: getHistory
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Complete chronological transaction list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EditTransaction'
+
+  /api/v1/projects/{project_id}/undo:
+    post:
+      summary: Undo last applied edit
+      operationId: undoStep
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Result of the undo operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstructionResult'
+
+  /api/v1/projects/{project_id}/redo:
+    post:
+      summary: Redo previously undone edit
+      operationId: redoStep
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Result of the redo operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstructionResult'
+
+  /api/v1/projects/{project_id}/restore:
+    post:
+      summary: Restore specific earlier edit state
+      operationId: restoreStep
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - step_index
+              properties:
+                step_index:
+                  type: integer
+      responses:
+        '200':
+          description: Restored timeline result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstructionResult'
+
+  /api/v1/projects/{project_id}/render:
+    post:
+      summary: Render final timeline video
+      description: Initiates asynchronous media rendering with FFmpeg filter chains and post-render frame-accurate validation.
+      operationId: renderTimeline
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                callback_url:
+                  type: string
+                  format: uri
+      responses:
+        '202':
+          description: Render job queued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobQueuedResponse'
+
+  /api/v1/jobs/{job_id}:
+    get:
+      summary: Query background job status
+      operationId: getJob
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Status, progress, and result download URLs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v1/jobs/{job_id}/download:
+    get:
+      summary: Download rendered output file
+      operationId: downloadJobOutput
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rendered video MP4 file.
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  responses:
+    ErrorResponse:
+      description: Standard IncuBrix JSON error payload.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - error
+            properties:
+              error:
+                type: object
+                required:
+                  - code
+                  - message
+                  - retryable
+                  - details
+                properties:
+                  code:
+                    type: string
+                    example: "INVALID_VIDEO"
+                  message:
+                    type: string
+                    example: "Detailed human-readable error explanation."
+                  retryable:
+                    type: boolean
+                    example: false
+                  details:
+                    type: object
+
+  schemas:
+    HealthStatus:
+      type: object
+      required:
+        - status
+        - app_name
+        - version
+        - timestamp
+      properties:
+        status:
+          type: string
+          example: "healthy"
+        app_name:
+          type: string
+          example: "IncuBrix Video Editor"
+        version:
+          type: string
+          example: "1.0.0"
+        timestamp:
+          type: string
+
+    ReadinessStatus:
+      type: object
+      required:
+        - status
+        - app_name
+        - version
+        - checks
+        - timestamp
+      properties:
+        status:
+          type: string
+          example: "ready"
+        app_name:
+          type: string
+        version:
+          type: string
+        checks:
+          type: object
+        timestamp:
+          type: string
+
+    InstructionRequest:
+      type: object
+      required:
+        - instruction
+      properties:
+        instruction:
+          type: string
+          example: "Add a caption 'Welcome!' when I say welcome to the channel"
+        answer:
+          type: string
+          nullable: true
+          example: "the second one"
+
+    InstructionStatusEnum:
+      type: string
+      enum:
+        - APPLIED
+        - NEEDS_CLARIFICATION
+        - REJECTED
+
+    InstructionResult:
+      type: object
+      required:
+        - status
+        - operations
+        - summary
+        - timeline_hash
+        - duration_s
+        - warnings
+      properties:
+        status:
+          $ref: '#/components/schemas/InstructionStatusEnum'
+        operations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Operation'
+        summary:
+          type: string
+          example: "Cut first 30 seconds."
+        question:
+          type: string
+          nullable: true
+          example: "Pricing is mentioned 3 times. Which occurrence would you like to remove?"
+        options:
+          type: array
+          items:
+            type: string
+          nullable: true
+          example: ["The first occurrence", "The second occurrence", "All occurrences"]
+        timeline_hash:
+          type: string
+          example: "dc97e4662c9d1107af9e..."
+        duration_s:
+          type: number
+          example: 270.0
+        time_policy:
+          type: string
+          nullable: true
+          example: "current"
+        warnings:
+          type: array
+          items:
+            type: string
+
+    Operation:
+      type: object
+      required:
+        - type
+        - params
+      properties:
+        type:
+          type: string
+          example: "CUT"
+        params:
+          type: object
+
+    Timeline:
+      type: object
+      required:
+        - id
+        - source_media_id
+        - segments
+        - anchors
+        - auto_captions_enabled
+      properties:
+        id:
+          type: string
+        source_media_id:
+          type: string
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineSegment'
+        anchors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentAnchor'
+        background_music:
+          $ref: '#/components/schemas/BackgroundMusic'
+          nullable: true
+        auto_captions_enabled:
+          type: boolean
+
+    TimelineSegment:
+      type: object
+      required:
+        - id
+        - source_media_id
+        - source_start_s
+        - source_end_s
+        - speed
+        - duration_s
+      properties:
+        id:
+          type: string
+        source_media_id:
+          type: string
+        source_start_s:
+          type: number
+        source_end_s:
+          type: number
+        speed:
+          type: number
+        duration_s:
+          type: number
+
+    ContentAnchor:
+      type: object
+      required:
+        - id
+        - type
+        - source_media_id
+        - source_start_s
+        - source_end_s
+        - properties
+        - active
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [caption, mute, bleep, auto_caption]
+        source_media_id:
+          type: string
+        source_start_s:
+          type: number
+        source_end_s:
+          type: number
+        properties:
+          type: object
+        active:
+          type: boolean
+        warning:
+          type: string
+          nullable: true
+
+    BackgroundMusic:
+      type: object
+      required:
+        - id
+        - source_path
+        - volume
+        - duck_volume
+        - duck_threshold_db
+      properties:
+        id:
+          type: string
+        source_path:
+          type: string
+        volume:
+          type: number
+        duck_volume:
+          type: number
+        duck_threshold_db:
+          type: number
+
+    TranscriptWord:
+      type: object
+      required:
+        - word
+        - start_s
+        - end_s
+        - confidence
+        - is_filler
+      properties:
+        word:
+          type: string
+        start_s:
+          type: number
+        end_s:
+          type: number
+        speaker:
+          type: string
+          nullable: true
+        confidence:
+          type: number
+        is_filler:
+          type: boolean
+
+    Transcript:
+      type: object
+      required:
+        - source_media_id
+        - words
+        - speakers
+      properties:
+        source_media_id:
+          type: string
+        words:
+          type: array
+          items:
+            $ref: '#/components/schemas/TranscriptWord'
+        speakers:
+          type: array
+          items:
+            type: string
+
+    EditTransaction:
+      type: object
+      required:
+        - id
+        - step_index
+        - instruction
+        - result
+        - timeline_before_hash
+        - timeline_after_hash
+      properties:
+        id:
+          type: string
+        step_index:
+          type: integer
+        instruction:
+          type: string
+        result:
+          $ref: '#/components/schemas/InstructionResult'
+        timeline_before_hash:
+          type: string
+        timeline_after_hash:
+          type: string
+
+    Job:
+      type: object
+      required:
+        - id
+        - type
+        - status
+        - progress
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          example: "render"
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        result:
+          type: object
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    UploadAcceptedResponse:
+      type: object
+      required:
+        - status
+        - job_id
+        - video_id
+        - project_id
+        - message
+      properties:
+        status:
+          type: string
+          example: "queued"
+        job_id:
+          type: string
+        video_id:
+          type: string
+        project_id:
+          type: string
+        message:
+          type: string
+
+    JobQueuedResponse:
+      type: object
+      required:
+        - status
+        - job_id
+        - project_id
+        - message
+      properties:
+        status:
+          type: string
+          example: "queued"
+        job_id:
+          type: string
+        project_id:
+          type: string
+        message:
+          type: string
+
+    VideoDetailResponse:
+      type: object
+      required:
+        - id
+        - source_media
+        - has_transcript
+      properties:
+        id:
+          type: string
+        source_media:
+          type: object
+        has_transcript:
+          type: boolean
+        transcript_summary:
+          type: object
+          nullable: true

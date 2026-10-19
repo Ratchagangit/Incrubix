@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_16_background_music
+steps:
+  - say: "Add background music"
+  - say: "render"

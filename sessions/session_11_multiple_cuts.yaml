@@ -1,0 +1,7 @@
+video: fixtures/test_video.mp4
+name: session_11_multiple_cuts
+steps:
+  - say: "Cut the first 30 seconds"
+  - say: "Remove 0:30-0:40"
+  - say: "Cut the last 20 seconds"
+  - say: "render"

@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_02_keep_range
+steps:
+  - say: "Keep from 0:30 to 2:00"
+  - say: "render"

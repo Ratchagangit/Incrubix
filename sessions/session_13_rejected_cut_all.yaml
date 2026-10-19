@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_13_rejected_cut_all
+steps:
+  - say: "Cut everything"
+  - say: "render"

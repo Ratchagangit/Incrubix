@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_03_speed_change
+steps:
+  - say: "Speed up from 1:00 to 1:30 by 2x"
+  - say: "render"

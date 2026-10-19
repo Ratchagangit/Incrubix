@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_18_time_formats
+steps:
+  - say: "Remove from 80 seconds to a minute twenty"
+  - say: "render"

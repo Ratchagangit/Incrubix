@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_09_remove_fillers
+steps:
+  - say: "Remove filler words"
+  - say: "render"

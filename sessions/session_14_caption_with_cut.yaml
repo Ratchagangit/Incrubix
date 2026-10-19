@@ -1,0 +1,6 @@
+video: fixtures/test_video.mp4
+name: session_14_caption_with_cut
+steps:
+  - say: "Add a caption 'Welcome!' when I say welcome to the channel"
+  - say: "Cut the first 30 seconds"
+  - say: "render"

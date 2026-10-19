@@ -1,0 +1,6 @@
+video: fixtures/test_video.mp4
+name: session_12_ambiguous_instruction
+steps:
+  - say: "Remove the boring part"
+  - answer: "Remove long silences (>2s)"
+  - say: "render"

@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_01_basic_cut
+steps:
+  - say: "Cut the first 30 seconds"
+  - say: "render"

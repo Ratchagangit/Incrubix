@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_10_remove_silences
+steps:
+  - say: "Remove dead air silences"
+  - say: "render"

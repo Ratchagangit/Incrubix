@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_06_bleep_words
+steps:
+  - say: "Bleep secret"
+  - say: "render"

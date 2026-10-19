@@ -1,0 +1,7 @@
+video: fixtures/test_video.mp4
+name: session_07_undo_redo
+steps:
+  - say: "Cut the first 30 seconds"
+  - say: "Undo"
+  - say: "Redo"
+  - say: "render"

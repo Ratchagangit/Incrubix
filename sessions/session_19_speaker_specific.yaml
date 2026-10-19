@@ -1,0 +1,5 @@
+video: fixtures/test_video.mp4
+name: session_19_speaker_specific
+steps:
+  - say: "Remove everything the guest says"
+  - say: "render"
