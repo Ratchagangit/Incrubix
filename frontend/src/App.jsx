@@ -6,6 +6,7 @@ import TimelineView from './components/TimelineView';
 import InstructionInput from './components/InstructionInput';
 import EditHistory from './components/EditHistory';
 import RenderStatus from './components/RenderStatus';
+import ErrorBoundary from './components/ErrorBoundary';
 import {
   checkHealth,
   getVideo,
@@ -51,18 +52,38 @@ export default function App() {
     setProjectId(data.project_id);
     setVideoId(data.video_id);
 
-    // Refresh project details
+    // Refresh each project resource independently to prevent cascading failures
     try {
       const v = await getVideo(data.video_id);
       setVideoMeta(v);
+    } catch (e) {
+      console.warn('Video metadata fetch notice:', e);
+    }
+
+    try {
       const t = await getTranscript(data.video_id);
       setTranscript(t);
+    } catch (e) {
+      try {
+        const t = await getTranscript(data.project_id);
+        setTranscript(t);
+      } catch (e2) {
+        console.warn('Transcript not ready yet:', e2);
+      }
+    }
+
+    try {
       const tl = await getTimeline(data.project_id);
       setTimeline(tl);
+    } catch (e) {
+      console.warn('Timeline fetch notice:', e);
+    }
+
+    try {
       const h = await getHistory(data.project_id);
-      setHistory(h);
-    } catch (err) {
-      console.error('Failed to load initial project state', err);
+      setHistory(Array.isArray(h) ? h : (h?.history || []));
+    } catch (e) {
+      console.warn('History fetch notice:', e);
     }
   };
 
@@ -79,7 +100,7 @@ export default function App() {
       const tl = await getTimeline(projectId);
       setTimeline(tl);
       const h = await getHistory(projectId);
-      setHistory(h);
+      setHistory(Array.isArray(h) ? h : (h?.history || []));
     } catch (err) {
       setLastResult({
         status: 'REJECTED',
@@ -101,7 +122,7 @@ export default function App() {
       const tl = await getTimeline(projectId);
       setTimeline(tl);
       const h = await getHistory(projectId);
-      setHistory(h);
+      setHistory(Array.isArray(h) ? h : (h?.history || []));
     } catch (err) {
       console.error('Undo failed', err);
     } finally {
@@ -119,7 +140,7 @@ export default function App() {
       const tl = await getTimeline(projectId);
       setTimeline(tl);
       const h = await getHistory(projectId);
-      setHistory(h);
+      setHistory(Array.isArray(h) ? h : (h?.history || []));
     } catch (err) {
       console.error('Redo failed', err);
     } finally {
@@ -137,7 +158,7 @@ export default function App() {
       const tl = await getTimeline(projectId);
       setTimeline(tl);
       const h = await getHistory(projectId);
-      setHistory(h);
+      setHistory(Array.isArray(h) ? h : (h?.history || []));
     } catch (err) {
       console.error('Restore failed', err);
     } finally {
@@ -162,42 +183,44 @@ export default function App() {
       </header>
 
       <main className="main-content">
-        {!projectId ? (
-          <div className="onboarding-card">
-            <VideoUpload onVideoUploaded={handleVideoUploaded} />
-          </div>
-        ) : (
-          <div className="workspace-grid">
-            {/* Left Column: Video Preview and Transcript */}
-            <div className="left-column">
-              <VideoPlayer videoId={videoId} onTimeUpdate={setCurrentTime} />
-              <TranscriptView transcript={transcript} currentTime={currentTime} />
+        <ErrorBoundary>
+          {!projectId ? (
+            <div className="onboarding-card">
+              <VideoUpload onVideoUploaded={handleVideoUploaded} />
             </div>
+          ) : (
+            <div className="workspace-grid">
+              {/* Left Column: Video Preview and Transcript */}
+              <div className="left-column">
+                <VideoPlayer videoId={videoId} onTimeUpdate={setCurrentTime} />
+                <TranscriptView transcript={transcript} currentTime={currentTime} />
+              </div>
 
-            {/* Right Column: Prompt Input, History, and Render */}
-            <div className="right-column">
-              <InstructionInput
-                onSendInstruction={handleSendInstruction}
-                loading={loading}
-                lastResult={lastResult}
-              />
-              <EditHistory
-                history={history}
-                onUndo={handleUndo}
-                onRedo={handleRedo}
-                onRestore={handleRestore}
-                canUndo={history.length > 0}
-                canRedo={true}
-              />
-              <RenderStatus projectId={projectId} />
-            </div>
+              {/* Right Column: Prompt Input, History, and Render */}
+              <div className="right-column">
+                <InstructionInput
+                  onSendInstruction={handleSendInstruction}
+                  loading={loading}
+                  lastResult={lastResult}
+                />
+                <EditHistory
+                  history={history}
+                  onUndo={handleUndo}
+                  onRedo={handleRedo}
+                  onRestore={handleRestore}
+                  canUndo={history.length > 0}
+                  canRedo={true}
+                />
+                <RenderStatus projectId={projectId} />
+              </div>
 
-            {/* Bottom Row: Timeline Visualizer */}
-            <div className="bottom-row">
-              <TimelineView timeline={timeline} timelineHash={timelineHash} />
+              {/* Bottom Row: Timeline Visualizer */}
+              <div className="bottom-row">
+                <TimelineView timeline={timeline} timelineHash={timelineHash} />
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </ErrorBoundary>
       </main>
 
       <footer className="app-footer">

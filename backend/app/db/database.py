@@ -22,7 +22,16 @@ class DataStore:
         self.projects[str(project.id)] = project
 
     def get_project(self, project_id: str) -> Optional[Project]:
-        return self.projects.get(str(project_id))
+        if not project_id:
+            return None
+        pid = str(project_id)
+        if pid in self.projects:
+            return self.projects[pid]
+        # Also allow lookup by source_media.id
+        for p in self.projects.values():
+            if str(p.source_media.id) == pid:
+                return p
+        return None
 
     def list_projects(self) -> list[Project]:
         return list(self.projects.values())

@@ -1,7 +1,9 @@
 import React from 'react';
 
 export default function EditHistory({ history, onUndo, onRedo, onRestore, canUndo, canRedo }) {
-  if (!history || history.length === 0) {
+  const items = Array.isArray(history) ? history : (history?.history || []);
+
+  if (!items || items.length === 0) {
     return (
       <div className="history-panel empty">
         <h3>Edit History</h3>
@@ -35,12 +37,12 @@ export default function EditHistory({ history, onUndo, onRedo, onRestore, canUnd
       </div>
 
       <div className="history-list">
-        {history.map((tx, idx) => (
+        {items.map((tx, idx) => (
           <div key={tx.id || idx} className="history-item">
-            <div className="step-num">#{tx.step_index}</div>
+            <div className="step-num">#{tx.step_index ?? idx + 1}</div>
             <div className="step-info">
-              <span className="step-instruction">"{tx.instruction}"</span>
-              <span className="step-summary">{tx.result?.summary}</span>
+              <span className="step-instruction">"{tx.instruction || 'Edit'}"</span>
+              <span className="step-summary">{tx.result?.summary || ''}</span>
               <code className="step-hash">
                 {tx.timeline_after_hash ? tx.timeline_after_hash.substring(0, 10) : ''}
               </code>

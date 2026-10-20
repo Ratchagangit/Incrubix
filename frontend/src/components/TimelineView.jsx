@@ -5,8 +5,8 @@ export default function TimelineView({ timeline, timelineHash }) {
     return null;
   }
 
-  const segments = timeline.segments;
-  const totalDuration = segments.reduce((sum, s) => sum + s.duration_s, 0);
+  const segments = timeline.segments || [];
+  const totalDuration = segments.reduce((sum, s) => sum + (s.duration_s || 0), 0);
 
   return (
     <div className="timeline-container">
@@ -14,7 +14,7 @@ export default function TimelineView({ timeline, timelineHash }) {
         <div>
           <h3>Dynamic Presentation Timeline</h3>
           <span className="subtitle">
-            Duration: <strong>{totalDuration.toFixed(2)}s</strong> | Segments: {segments.length} | Anchors: {timeline.anchors?.length || 0}
+            Duration: <strong>{(totalDuration || 0).toFixed(2)}s</strong> | Segments: {segments.length} | Anchors: {timeline.anchors?.length || 0}
           </span>
         </div>
         {timelineHash && (
@@ -27,16 +27,19 @@ export default function TimelineView({ timeline, timelineHash }) {
 
       <div className="track-bar">
         {segments.map((seg, idx) => {
-          const widthPct = totalDuration > 0 ? (seg.duration_s / totalDuration) * 100 : 0;
+          const dur = seg.duration_s || 0;
+          const widthPct = totalDuration > 0 ? (dur / totalDuration) * 100 : 0;
+          const sStart = (seg.source_start_s ?? 0).toFixed(1);
+          const sEnd = (seg.source_end_s ?? 0).toFixed(1);
           return (
             <div
               key={seg.id || idx}
               className={`track-segment segment-color-${idx % 5}`}
               style={{ width: `${widthPct}%` }}
-              title={`Segment #${idx + 1}: Source [${seg.source_start_s.toFixed(1)}s - ${seg.source_end_s.toFixed(1)}s] @ ${seg.speed}x (Duration: ${seg.duration_s.toFixed(1)}s)`}
+              title={`Segment #${idx + 1}: Source [${sStart}s - ${sEnd}s] @ ${seg.speed || 1}x (Duration: ${dur.toFixed(1)}s)`}
             >
               <span className="seg-label">
-                #{idx + 1} ({seg.duration_s.toFixed(1)}s) {seg.speed !== 1 ? `[${seg.speed}x]` : ''}
+                #{idx + 1} ({dur.toFixed(1)}s) {seg.speed && seg.speed !== 1 ? `[${seg.speed}x]` : ''}
               </span>
             </div>
           );
@@ -50,10 +53,10 @@ export default function TimelineView({ timeline, timelineHash }) {
             {timeline.anchors.map((anc, idx) => (
               <span
                 key={anc.id || idx}
-                className={`anchor-chip ${anc.active ? 'active' : 'inactive'} type-${anc.type}`}
-                title={`Source: [${anc.source_start_s.toFixed(1)}s - ${anc.source_end_s.toFixed(1)}s] ${anc.warning ? `Warning: ${anc.warning}` : ''}`}
+                className={`anchor-chip ${anc.active ? 'active' : 'inactive'} type-${anc.type || 'edit'}`}
+                title={`Source: [${(anc.source_start_s ?? 0).toFixed(1)}s - ${(anc.source_end_s ?? 0).toFixed(1)}s] ${anc.warning ? `Warning: ${anc.warning}` : ''}`}
               >
-                <strong>{anc.type.toUpperCase()}:</strong> {anc.properties?.text ? `"${anc.properties.text}"` : ''}
+                <strong>{(anc.type || 'ANCHOR').toUpperCase()}:</strong> {anc.properties?.text ? `"${anc.properties.text}"` : ''}
                 {anc.active ? ' [Active]' : ' [Cut/Suppressed]'}
               </span>
             ))}
