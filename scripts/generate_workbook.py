@@ -65,7 +65,7 @@ def build_workbook(output_path: str):
     ws_details.append([])
     
     details_data = [
-        ("Candidate Name / Submission ID", "IncuBrix Candidate (PS2)"),
+        ("Candidate Name / Submission ID", "Ratchagan (PS2)"),
         ("Assessment Problem Statement", "PS2: Prompt-Based Video Editing Engine"),
         ("Assessment Date", "October 19, 2026"),
         ("Repository Name", "incubrix-prompt-video-engine"),
@@ -273,7 +273,7 @@ def build_workbook(output_path: str):
         ("Declaration 3: Source Media Immutability", "The engine strictly adheres to the principle of non-destructive editing. Raw source media files are preserved untouched in their original state with SHA-256 verification."),
         ("Declaration 4: Determinism Guarantee", "Timeline mutations and canonical hashing are 100% deterministic and reproducible across multiple runs under identical input parameters."),
         ("Declaration 5: Reproducibility & Offline Verification", "The solution is complete, containerized, and verifiable without requiring paid third-party API keys through the provided deterministic mock transcription and LLM adapters."),
-        ("Candidate Acknowledgment", "Confirmed and Signed: IncuBrix Candidate"),
+        ("Candidate Acknowledgment", "Confirmed and Signed: Ratchagan"),
         ("Submission Timestamp", "2026-10-19T20:55:00+05:30")
     ]
 
