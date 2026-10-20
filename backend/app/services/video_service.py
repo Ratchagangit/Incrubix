@@ -29,14 +29,44 @@ class VideoService:
         ffprobe_bin = self.settings.FFPROBE_PATH
         # Check if ffprobe executable is found
         if not shutil.which(ffprobe_bin) and not os.path.exists(ffprobe_bin):
-            # Fallback estimation for development/testing environments without ffprobe installed
+            # Fallback: probe via ffmpeg -i if ffprobe is absent
             file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            ffmpeg_bin = self.settings.FFMPEG_PATH
+            if not shutil.which(ffmpeg_bin) and not os.path.exists(ffmpeg_bin):
+                try:
+                    import imageio_ffmpeg
+                    ffmpeg_bin = imageio_ffmpeg.get_ffmpeg_exe()
+                except Exception:
+                    pass
+
+            duration_s = 300.0
+            frame_rate = 30.0
+            width, height = 1920, 1080
+            has_audio = True
+
+            if shutil.which(ffmpeg_bin) or os.path.exists(ffmpeg_bin):
+                try:
+                    res = subprocess.run([ffmpeg_bin, "-i", file_path], capture_output=True, text=True, timeout=10)
+                    import re
+                    match = re.search(r'Duration:\s*(\d+):(\d+):([\d\.]+)', res.stderr)
+                    if match:
+                        h, m, s = match.groups()
+                        duration_s = int(h) * 3600 + int(m) * 60 + float(s)
+                    fps_match = re.search(r'(\d+(?:\.\d+)?)\s*fps', res.stderr)
+                    if fps_match:
+                        frame_rate = float(fps_match.group(1))
+                    res_match = re.search(r'(\d{3,4})x(\d{3,4})', res.stderr)
+                    if res_match:
+                        width, height = int(res_match.group(1)), int(res_match.group(2))
+                except Exception:
+                    pass
+
             return {
-                "duration_s": 300.0,
-                "frame_rate": 30.0,
-                "width": 1920,
-                "height": 1080,
-                "has_audio": True,
+                "duration_s": duration_s,
+                "frame_rate": frame_rate,
+                "width": width,
+                "height": height,
+                "has_audio": has_audio,
                 "codec": "h264",
                 "format_name": "mp4",
                 "file_size": file_size
@@ -63,14 +93,44 @@ class VideoService:
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError) as e:
             raise VideoError(f"Failed to probe video file with ffprobe: {str(e)}")
         except FileNotFoundError:
-            # Fallback if ffprobe command failed to launch
+            # Fallback: probe via ffmpeg -i if ffprobe is absent
             file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            ffmpeg_bin = self.settings.FFMPEG_PATH
+            if not shutil.which(ffmpeg_bin) and not os.path.exists(ffmpeg_bin):
+                try:
+                    import imageio_ffmpeg
+                    ffmpeg_bin = imageio_ffmpeg.get_ffmpeg_exe()
+                except Exception:
+                    pass
+
+            duration_s = 300.0
+            frame_rate = 30.0
+            width, height = 1920, 1080
+            has_audio = True
+
+            if shutil.which(ffmpeg_bin) or os.path.exists(ffmpeg_bin):
+                try:
+                    res = subprocess.run([ffmpeg_bin, "-i", file_path], capture_output=True, text=True, timeout=10)
+                    import re
+                    match = re.search(r'Duration:\s*(\d+):(\d+):([\d\.]+)', res.stderr)
+                    if match:
+                        h, m, s = match.groups()
+                        duration_s = int(h) * 3600 + int(m) * 60 + float(s)
+                    fps_match = re.search(r'(\d+(?:\.\d+)?)\s*fps', res.stderr)
+                    if fps_match:
+                        frame_rate = float(fps_match.group(1))
+                    res_match = re.search(r'(\d{3,4})x(\d{3,4})', res.stderr)
+                    if res_match:
+                        width, height = int(res_match.group(1)), int(res_match.group(2))
+                except Exception:
+                    pass
+
             return {
-                "duration_s": 300.0,
-                "frame_rate": 30.0,
-                "width": 1920,
-                "height": 1080,
-                "has_audio": True,
+                "duration_s": duration_s,
+                "frame_rate": frame_rate,
+                "width": width,
+                "height": height,
+                "has_audio": has_audio,
                 "codec": "h264",
                 "format_name": "mp4",
                 "file_size": file_size

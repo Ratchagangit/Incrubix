@@ -24,6 +24,16 @@ class RenderService:
         self.storage_service = storage_service or create_storage_service(self.settings)
         self.video_service = video_service or VideoService(self.storage_service, self.settings)
 
+    def get_ffmpeg_bin(self) -> str:
+        bin_path = self.settings.FFMPEG_PATH
+        if shutil.which(bin_path) or os.path.exists(bin_path):
+            return bin_path
+        try:
+            import imageio_ffmpeg
+            return imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            return bin_path
+
     def _resolve_timeline_anchors(self, timeline: Timeline) -> List[Dict[str, Any]]:
         """Map content anchors from source time coordinates into timeline time coordinates."""
         resolved = []
@@ -91,7 +101,7 @@ class RenderService:
 
     def build_ffmpeg_command(self, project: Project, output_path: str) -> List[str]:
         """Build the complete single-pass FFmpeg command using filter_complex."""
-        ffmpeg_bin = self.settings.FFMPEG_PATH
+        ffmpeg_bin = self.get_ffmpeg_bin()
         source_local = self.storage_service.get_local_path(project.source_media.file_path)
 
         cmd = [ffmpeg_bin, "-y", "-i", source_local]
@@ -236,7 +246,7 @@ class RenderService:
         output_filename = f"render_{project.id}.mp4"
         output_path = str(output_dir / output_filename)
 
-        ffmpeg_bin = self.settings.FFMPEG_PATH
+        ffmpeg_bin = self.get_ffmpeg_bin()
         has_ffmpeg = bool(shutil.which(ffmpeg_bin) or os.path.exists(ffmpeg_bin))
 
         if not has_ffmpeg:
